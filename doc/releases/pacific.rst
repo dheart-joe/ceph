@@ -50,6 +50,10 @@ Notable Changes
   This improves out of the box performance of Ceph by allowing more PGs
   to be created for a given pool.
 
+* A long-standing bug that prevented 32-bit and 64-bit client/server
+  interoperability under msgr v2 has been fixed.  In particular, mixing armv7l
+  (armhf) and x86_64 or aarch64 servers in the same cluster now works.
+
 Changelog
 ---------
 

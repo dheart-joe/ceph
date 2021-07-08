@@ -44,12 +44,6 @@ Notable Changes
   deprecated and will be removed in a future release.  Please use
   ``nfs cluster rm`` and ``nfs export rm`` instead.
 
-* mgr/pg_autoscaler: Autoscaler will now start out by scaling each
-  pool to have a full complements of pgs from the start and will only
-  decrease it when other pools need more pgs due to increased usage.
-  This improves out of the box performance of Ceph by allowing more PGs
-  to be created for a given pool.
-
 * A long-standing bug that prevented 32-bit and 64-bit client/server
   interoperability under msgr v2 has been fixed.  In particular, mixing armv7l
   (armhf) and x86_64 or aarch64 servers in the same cluster now works.

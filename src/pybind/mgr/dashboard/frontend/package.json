@@ -50,7 +50,7 @@
     "@angular/localize": "18.2.11",
     "@angular/platform-browser": "18.2.11",
     "@angular/platform-browser-dynamic": "18.2.11",
-    "@angular/router": "18.2.11",
+    "@angular/router": "20.3.2",
     "@carbon/icons": "11.41.0",
     "@carbon/styles": "1.57.0",
     "@ibm/plex": "6.4.0",

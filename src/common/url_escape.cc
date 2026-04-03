@@ -10,7 +10,7 @@ std::string url_escape(const std::string& s)
 {
   std::string out;
   for (auto c : s) {
-    if (std::isalnum(c) || c == '-' || c == '.' || c == '_' || c == '~' ||
+    if (std::isalpha(c) || c == '-' || c == '.' || c == '_' || c == '~' ||
 	c == '/') {
       out.push_back(c);
     } else {

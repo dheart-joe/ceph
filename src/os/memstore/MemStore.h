@@ -254,7 +254,7 @@ public:
   int mount() override;
   int umount() override;
 
-  int fsck(bool deep) override {
+  int fsck(bool deep, store_fsck_stats_t *fsck_stats = nullptr) override {
     return 0;
   }
 

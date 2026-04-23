@@ -3008,8 +3008,8 @@ private:
     shared_blob_2hash_tracker_t& sb_ref_counts,
     sb_info_space_efficient_map_t& sb_info);
 
-  int _fsck(FSCKDepth depth, bool repair);
-  int _fsck_on_open(BlueStore::FSCKDepth depth, bool repair);
+  int _fsck(FSCKDepth depth, bool repair, store_fsck_stats_t *fsck_stats);
+  int _fsck_on_open(BlueStore::FSCKDepth depth, bool repair, store_fsck_stats_t *fsck_stats);
 
   void _buffer_cache_write(
     TransContext *txc,
@@ -3143,15 +3143,15 @@ public:
   int cold_open();
   int cold_close();
 
-  int fsck(bool deep) override {
-    return _fsck(deep ? FSCK_DEEP : FSCK_REGULAR, false);
+  int fsck(bool deep, store_fsck_stats_t *fsck_stats = nullptr) override {
+    return _fsck(deep ? FSCK_DEEP : FSCK_REGULAR, false, fsck_stats);
   }
-  int repair(bool deep) override {
-    return _fsck(deep ? FSCK_DEEP : FSCK_REGULAR, true);
+  int repair(bool deep, store_fsck_stats_t *fsck_stats = nullptr) override {
+    return _fsck(deep ? FSCK_DEEP : FSCK_REGULAR, true, fsck_stats);
   }
   int revert_wal_to_plain();
   int quick_fix() override {
-    return _fsck(FSCK_SHALLOW, true);
+    return _fsck(FSCK_SHALLOW, true, nullptr);
   }
 
   void set_cache_shards(unsigned num) override;

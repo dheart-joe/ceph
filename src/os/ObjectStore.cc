@@ -109,3 +109,34 @@ int ObjectStore::get_ideal_list_max()
 {
   return cct->_conf->osd_objectstore_ideal_list_max;
 }
+
+
+//store_fsck_stats_t
+
+std::ostream& operator<<(std::ostream& out, const store_fsck_stats_t& s)
+{
+  out << "(" << s.num_objects << " objects, "
+      << s.num_sharded_objects << " sharded objects, "
+      << s.num_extents << " extents, "
+      << s.num_blobs << " blobs, "
+      << s.num_spanning_blobs << " spanning blobs, "
+      << s.num_shared_blobs << " shared blobs, "
+      << s.warnings_found << " warnings found, "
+      << s.errors_found << " errors found, "
+      << s.repaired_found << " repaired found"
+      << ")";
+  return out;
+}
+
+void store_fsck_stats_t::dump(Formatter* f) const
+{
+  f->dump_unsigned("num_objects", num_objects);
+  f->dump_unsigned("num_sharded_objects", num_sharded_objects);
+  f->dump_unsigned("num_extents", num_extents);
+  f->dump_unsigned("num_blobs", num_blobs);
+  f->dump_unsigned("num_spanning_blobs", num_spanning_blobs);
+  f->dump_unsigned("num_shared_blobs", num_shared_blobs);
+  f->dump_unsigned("warnings_found", warnings_found);
+  f->dump_unsigned("errors_found", errors_found);
+  f->dump_unsigned("repaired_found", repaired_found);
+}

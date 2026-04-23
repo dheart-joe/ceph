@@ -4140,6 +4140,180 @@ TEST_P(StoreTest, BlueStoreUnshareBlobTest) {
     }
   }
   {
+    ghobject_t coid1 = hoid;
+    coid1.hobj.snap = 1;
+    ghobject_t coid2 = hoid;
+    coid2.hobj.snap = 2;
+
+    bufferlist data, newdata;
+    data.append(string(1<<20, 'a')); //Conditions for resharding are met.
+    uint32_t hoid_size = data.length();
+
+    ObjectStore::Transaction t;
+    t.write(cid, hoid, 0, data.length(), data);
+    cerr << "Creating object and write 8K " << hoid << std::endl;
+    r = queue_transaction(store, ch, std::move(t));
+    ASSERT_EQ(r, 0);
+
+    ObjectStore::Transaction clone_t1;
+    clone_t1.clone(cid, hoid, coid1);
+    cerr << "Clone object" << std::endl;
+    r = queue_transaction(store, ch, std::move(clone_t1));
+    ASSERT_EQ(r, 0);
+
+    ObjectStore::Transaction clone_t2;
+    clone_t2.clone(cid, hoid, coid2);
+    cerr << "Clone object" << std::endl;
+    r = queue_transaction(store, ch, std::move(clone_t2));
+    ASSERT_EQ(r, 0);
+
+    data.clear();
+    data.append(string(4096, 'b'));
+
+    ObjectStore::Transaction t3;
+    t3.write(cid, hoid, 0, data.length(), data);
+    cerr << "Writing 4k to source object " << hoid << std::endl;
+    r = queue_transaction(store, ch, std::move(t3));
+    ASSERT_EQ(r, 0);
+    ObjectStore::Transaction t4;
+    t4.write(cid, hoid, 8192, data.length(), data);
+    cerr << "Writing 4k to source object " << hoid << std::endl;
+    t4.write(cid, hoid, 16384, data.length(), data);
+    cerr << "Writing 4k to source object " << hoid << std::endl;
+    r = queue_transaction(store, ch, std::move(t4));
+    ASSERT_EQ(r, 0);
+
+    {
+      ch.reset();
+      // this trims hoid one out of onode cache
+      EXPECT_EQ(store->umount(), 0);
+      EXPECT_EQ(store->mount(), 0);
+      ch = store->open_collection(cid);
+    }
+
+    //remove coid1
+    {
+      ObjectStore::Transaction c1_remove_t;
+      c1_remove_t.remove(cid, coid1);
+      cerr << "Deleting dest object" << coid1 << std::endl;
+      r = queue_transaction(store, ch, std::move(c1_remove_t));
+      ASSERT_EQ(r, 0);
+      {
+        ch.reset();
+        // this ensures remove operation submitted to kv store
+        EXPECT_EQ(store->umount(), 0);
+        EXPECT_EQ(store->fsck(true), 0);
+        EXPECT_EQ(store->mount(), 0);
+        ch = store->open_collection(cid);
+      }
+      BlueStore* bstore = dynamic_cast<BlueStore*> (store.get());
+      ch = bstore->open_collection(cid);
+      auto *bstore_ch = dynamic_cast<BlueStore::Collection*>(ch.get());
+      std::shared_lock l(bstore_ch->lock);
+      auto* kv = bstore->get_kv();
+
+      BlueStore::OnodeRef o = bstore_ch->get_onode(hoid, false);
+      o->extent_map.fault_range(kv, 0, hoid_size);
+      ASSERT_GT(o->extent_map.extent_map.size(), 0);
+      std::set<BlueStore::SharedBlob*> hoid_shared_blobs;
+      for (auto& e : o->extent_map.extent_map) {
+        const bluestore_blob_t& b = e.blob->get_blob();
+
+        switch (e.logical_offset) {
+        case 0: {
+          ASSERT_EQ(b.is_shared(),false);
+          break;
+        }
+        case 4096: {
+          ASSERT_EQ(b.is_shared(),true);
+          break;
+        }
+        case 8192: {
+          ASSERT_EQ(b.is_shared(),false);
+          break;
+        }
+        case 12288: {
+          ASSERT_EQ(b.is_shared(),true);
+          break;
+        }
+        case 16384: {
+          ASSERT_EQ(b.is_shared(),false);
+          break;
+        }
+        default: {
+          ASSERT_EQ(b.is_shared(),true);
+          break;
+        }
+        }
+	if (b.is_shared()) {
+          BlueStore::SharedBlobRef sb = e.blob->get_shared_blob();
+          bstore_ch->load_shared_blob(sb);
+          ASSERT_EQ(sb->loaded, true);
+	  hoid_shared_blobs.emplace(sb.get());
+        }
+      }
+
+      BlueStore::OnodeRef o_coid2 = bstore_ch->get_onode(coid2, false);
+      o_coid2->extent_map.fault_range(kv, 0, hoid_size);
+      std::set<BlueStore::SharedBlob*> coid2_shared_blobs;
+      for (auto& e : o_coid2->extent_map.extent_map) {
+        const bluestore_blob_t& b = e.blob->get_blob();
+        ASSERT_EQ(b.is_shared(), true);
+        BlueStore::SharedBlobRef sb = e.blob->get_shared_blob();
+        bstore_ch->load_shared_blob(sb);
+        ASSERT_EQ(sb->loaded, true);
+        coid2_shared_blobs.emplace(sb.get());
+      }
+      ASSERT_EQ(hoid_shared_blobs, coid2_shared_blobs);
+    }
+
+    //remove coid2
+    {
+      ObjectStore::Transaction c2_remove_t;
+      c2_remove_t.remove(cid, coid2);
+      cerr << "Deleting dest object" << coid2 << std::endl;
+      r = queue_transaction(store, ch, std::move(c2_remove_t));
+      ASSERT_EQ(r, 0);
+      {
+        ch.reset();
+        // this ensures remove operation submitted to kv store
+        EXPECT_EQ(store->umount(), 0);
+        EXPECT_EQ(store->fsck(true), 0);
+        EXPECT_EQ(store->mount(), 0);
+        ch = store->open_collection(cid);
+      }
+      BlueStore* bstore = dynamic_cast<BlueStore*> (store.get());
+      ch = bstore->open_collection(cid);
+      auto *bstore_ch = dynamic_cast<BlueStore::Collection*>(ch.get());
+      std::shared_lock l(bstore_ch->lock);
+      BlueStore::OnodeRef o = bstore_ch->get_onode(hoid, false);
+
+      auto* kv = bstore->get_kv();
+      o->extent_map.fault_range(kv, 0, hoid_size);
+      ASSERT_GT(o->extent_map.extent_map.size(), 0);
+      for (auto& e : o->extent_map.extent_map) {
+        const bluestore_blob_t& b = e.blob->get_blob();
+        ASSERT_EQ(b.is_shared(), false);
+      }
+    }
+
+    {
+      BlueStore* bstore = dynamic_cast<BlueStore*> (store.get());
+      auto* kv = bstore->get_kv();
+
+      // to be inline with BlueStore.cc
+      const string PREFIX_SHARED_BLOB = "X";
+
+      size_t cnt = 0;
+      auto it = kv->get_iterator(PREFIX_SHARED_BLOB);
+      ceph_assert(it);
+      for (it->lower_bound(string()); it->valid(); it->next()) {
+        ++cnt;
+      }
+      ASSERT_EQ(cnt, 0);
+    }
+  }
+  {
     ObjectStore::Transaction t;
     t.remove(cid, hoid);
     t.remove_collection(cid);

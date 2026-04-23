@@ -62,6 +62,22 @@ typedef uint32_t osflagbits_t;
 const int SKIP_JOURNAL_REPLAY = 1 << 0;
 const int SKIP_MOUNT_OMAP = 1 << 1;
 
+struct store_fsck_stats_t
+{
+  uint64_t num_objects = 0;
+  uint64_t num_sharded_objects = 0;
+  uint64_t num_extents = 0;
+  uint64_t num_blobs = 0;
+  uint64_t num_spanning_blobs = 0;
+  uint64_t num_shared_blobs = 0;
+  uint64_t warnings_found = 0;
+  uint64_t errors_found = 0;
+  uint64_t repaired_found = 0;
+
+  void dump(ceph::Formatter* f) const;
+  friend std::ostream& operator<<(std::ostream& out, const store_fsck_stats_t& s);
+};
+
 class ObjectStore {
 protected:
   std::string path;
@@ -277,10 +293,10 @@ public:
   virtual int umount_readonly() {
     return -EOPNOTSUPP;
   }
-  virtual int fsck(bool deep) {
+  virtual int fsck(bool deep, store_fsck_stats_t *fsck_stats = nullptr) {
     return -EOPNOTSUPP;
   }
-  virtual int repair(bool deep) {
+  virtual int repair(bool deep, store_fsck_stats_t *fsck_stats = nullptr) {
     return -EOPNOTSUPP;
   }
   virtual int quick_fix() {
